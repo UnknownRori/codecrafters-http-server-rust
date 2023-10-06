@@ -1,6 +1,10 @@
 use core::fmt;
+use std::env;
+use std::sync::Arc;
+use tokio::fs::File;
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Mutex;
 
 struct Request {
     user_agent: String,
@@ -20,6 +24,7 @@ enum HttpCode {
 
 enum ContentType {
     TextPlain,
+    OctetStream,
     None,
 }
 
@@ -27,6 +32,7 @@ impl fmt::Display for ContentType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let str = match self {
             ContentType::TextPlain => "Content-Type: text/plain",
+            ContentType::OctetStream => "Content-Type: application/octet-stream",
             ContentType::None => "",
         };
 
@@ -103,8 +109,8 @@ fn respond(http: HttpCode, content_type: ContentType, message: &str) -> String {
     response.push_str(http.to_string().as_str());
 
     match content_type {
-        ContentType::TextPlain => response.push_str(content_type.to_string().as_str()),
         ContentType::None => (),
+        _ => response.push_str(content_type.to_string().as_str()),
     };
 
     if !message.is_empty() {
@@ -127,7 +133,7 @@ async fn write_stream(stream: &mut TcpStream, message: &str) {
         .expect("Failed to send a response");
 }
 
-async fn handle_connection(mut stream: TcpStream) {
+async fn handle_connection(mut stream: TcpStream, filedir: &str) {
     let request = parse_request(&mut stream).await;
 
     println!("Got path: {}", request.path);
@@ -142,6 +148,24 @@ async fn handle_connection(mut stream: TcpStream) {
             request.user_agent.as_str(),
         );
         write_stream(&mut stream, &response).await;
+    } else if request.path.starts_with("/files") {
+        let content = request.path.replace("/files/", "");
+        let path = format!("{}/{}", filedir, content);
+        let file = File::open(path).await;
+        match file {
+            Ok(mut file) => {
+                let mut buffer = String::new();
+                file.read_to_string(&mut buffer)
+                    .await
+                    .expect("Failed to read a file");
+                let response = respond(HttpCode::Ok200, ContentType::OctetStream, &buffer);
+                write_stream(&mut stream, &response).await;
+            }
+            Err(_) => {
+                let response = respond(HttpCode::Err404, ContentType::None, "");
+                write_stream(&mut stream, &response).await;
+            }
+        }
     } else if request.path == "/" {
         let response = respond(HttpCode::Ok200, ContentType::None, "");
         write_stream(&mut stream, &response).await;
@@ -155,13 +179,23 @@ async fn handle_connection(mut stream: TcpStream) {
 async fn main() {
     let conn = "127.0.0.1:4221";
     let listener = TcpListener::bind(&conn).await.unwrap();
+    let args = env::args().collect::<Vec<String>>();
+    println!("{:#?}", args);
+
+    let directory = if args.len() > 2 && args[1] == "--directory" {
+        Arc::new(Mutex::new(args[2].to_owned()))
+    } else {
+        Arc::new(Mutex::new(String::new()))
+    };
 
     println!("Server started at {}", &conn);
     loop {
         let (stream, _) = listener.accept().await.unwrap();
+        let directory_clone = Arc::clone(&directory);
         tokio::spawn(async move {
             println!("accepted new connection");
-            handle_connection(stream).await;
+            let directory = directory_clone.lock().await;
+            handle_connection(stream, &directory).await;
         });
     }
 }
