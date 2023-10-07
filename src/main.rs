@@ -118,7 +118,7 @@ fn respond(http: HttpCode, content_type: ContentType, message: &str) -> String {
 }
 
 async fn write_stream(stream: &mut TcpStream, message: &str) {
-    // println!("{:#?}", &message);
+    println!("{:#?}", &message);
 
     stream
         .write(&message.as_bytes())
