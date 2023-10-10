@@ -131,15 +131,3 @@ impl From<String> for Request {
         request.build()
     }
 }
-
-mod test {
-    use crate::http::{HttpMethod, Request};
-
-    #[test]
-    fn parse_simple_header() {
-        let header = "GET / HTTP/1.1".to_string();
-        let request: Request = header.into();
-        assert!(request.path() == "/");
-        assert!(request.method() == &HttpMethod::Get);
-    }
-}

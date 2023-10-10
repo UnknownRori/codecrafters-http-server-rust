@@ -41,11 +41,11 @@ impl<T> Routes<T> {
     /// Resolve URL using Dynamic URL Matching
     #[allow(unreachable_code)]
     pub fn resolve(&self, request: &mut Request) -> Option<Arc<Route<T>>> {
-        println!(
-            "Method : {:#?}\npath: : {}\n\n",
-            request.method(),
-            request.path()
-        );
+        // println!(
+        //     "Method : {:#?}\npath: : {}\n\n",
+        //     request.method(),
+        //     request.path()
+        // );
 
         let routes: &Vec<Arc<Route<T>>> = match request.method() {
             HttpMethod::Get => self.get.as_ref(),

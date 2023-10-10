@@ -38,6 +38,21 @@ fn main() {
     );
 
     app.get(
+        "/echo/{echo}/{echo}",
+        Arc::new(|request, _| {
+            let response = ResponseBuilder::new().code(HttpCode::Ok200).content(
+                format!(
+                    "{}/{}",
+                    request.param().get(0).unwrap().to_owned(),
+                    request.param().get(1).unwrap().to_owned(),
+                ),
+                http_server_starter_rust::http::ContentType::TextPlain,
+            );
+            Ok(response.into())
+        }),
+    );
+
+    app.get(
         "/echo/{echo}",
         Arc::new(|request, _| {
             let response = ResponseBuilder::new().code(HttpCode::Ok200).content(
