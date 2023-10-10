@@ -39,6 +39,10 @@ where
             .register_route(HttpMethod::Post, url.to_owned(), controller);
     }
 
+    pub fn set_not_found_route(&mut self, controller: FnController<T>) {
+        self.routes.set_not_found_route(controller);
+    }
+
     pub fn serve(self) -> Result<(), Box<dyn std::error::Error>> {
         let routes = Arc::new(RwLock::new(self.routes));
         let application_data = Arc::new(RwLock::new(self.application_data));
@@ -69,7 +73,9 @@ fn handle<T>(
 
     {
         let routes = routes.read().unwrap();
-        let route = routes.resolve(&mut request).unwrap();
+        let route = routes
+            .resolve(&mut request)
+            .unwrap_or(routes.get_not_found_route());
         let request = Arc::new(RwLock::new(request));
         let controller = (*route).controller();
         {
@@ -92,7 +98,7 @@ fn resolve<T>(
     let result_controller = controller(&request, &data).unwrap();
     let result = result_controller.to_string();
 
-    println!("Sending Response : {:#?}", &result);
+    // println!("Sending Response : {:#?}", &result);
     stream
         .write(&result.as_bytes())
         .expect("Failed to send a response");
